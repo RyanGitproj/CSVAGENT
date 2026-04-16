@@ -1,6 +1,9 @@
 // API client for AskNova frontend (Vite version)
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+// Debug log pour vérifier l'URL API active
+console.log("API URL active =", API_BASE_URL);
+
 // Helper function for JSON fetch
 async function fetchJson(url, options = {}) {
   const r = await fetch(url, options);
