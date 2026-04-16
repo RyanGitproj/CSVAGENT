@@ -32,11 +32,20 @@ ENV/
 dist/
 build/
 
+# --- Node.js / Frontend ---
+node_modules/
+dist/
+.nuxt/
+.cache/
+.vuepress/dist/
+*.local
+
 # --- Project data / caches (local only) ---
 important/
 vectorestore/
 parquet/
 tmp/
+data/
 
 # --- OS & editors ---
 .DS_Store

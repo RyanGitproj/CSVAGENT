@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "askcsv-api"
 version = "0.2.0"
-description = "FastAPI + LangChain: CSV ingestion (Parquet + FAISS) and natural-language Q&A over tabular data."
+description = "Local (offline) FastAPI: ingest CSV/Excel/PDF and answer questions via SQL-first + RAG using local models."
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 packages = [
@@ -9,30 +9,53 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-uvicorn = "^0.23.2"
-langserve = {extras = ["server"], version = ">=0.0.30"}
-langchain-community = "^0.2.12"
-langchain-openai = "^0.1.22"
+python = ">=3.11,<4.0"
+# Web (FastAPI 0.115.x = branche stable récente, Pydantic v2)
+fastapi = ">=0.115.6,<0.116"
+uvicorn = { version = ">=0.34.0,<0.35", extras = ["standard"] }
+pydantic = ">=2.10.0,<3.0"
+httpx = ">=0.27.0,<0.29"
+python-multipart = ">=0.0.9"
 python-dotenv = "^1.0.1"
+# LangChain 1.2.x : aligné sur langchain-core 1.2.x (Pydantic v2 ; warning Py3.14 côté import pydantic.v1 encore présent dans langchain-core jusqu’à correctif amont)
+langchain = ">=1.2.14,<1.3"
+langchain-core = ">=1.2.23,<1.3"
+langchain-community = ">=0.4.1,<0.5"
+langchain-text-splitters = ">=1.1.1,<1.2"
+langchain-ollama = ">=1.0.1,<1.1"
+langchain-google-genai = ">=3.2.0,<4.0"
+langchain-groq = ">=1.1.2,<1.2"
 faiss-cpu = "^1.8.0.post1"
-langchain-experimental = "^0.0.64"
 aiofiles = "^24.1.0"
-pyarrow = "^17.0.0"
+pyarrow = ">=17.0.0,<30"
 cachetools = "^5.5.0"
 pandas = "^2.2.2"
-python-multipart = "^0.0.9"
 tabulate = "^0.9.0"
 chardet = "^5.2.0"
+duckdb = "^1.1.3"
+openpyxl = "^3.1.5"
+pypdf = "^5.3.0"
+sentence-transformers = "^3.4.1"
+sqlparse = "^0.5.3"
+rank-bm25 = "^0.2.2"
+pdf2image = { version = "^1.17.0", optional = true }
+pytesseract = { version = "^0.3.13", optional = true }
+Pillow = { version = "^10.4.0", optional = true }
 
+[tool.poetry.extras]
+ocr = ["pdf2image", "pytesseract", "Pillow"]
 
 [tool.poetry.group.dev.dependencies]
-langchain-cli = ">=0.0.15"
 pytest = "^8.0.0"
-httpx = "^0.27.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # Amont: langchain_core._api.deprecation importe pydantic.v1 pour la rétrocompat (message sur Python 3.14+)
+    "ignore:Core Pydantic V1 functionality isn't compatible with Python:UserWarning",
+    # Amont: FastAPI utilise encore asyncio.iscoroutinefunction (Python 3.14+)
+    "ignore:'asyncio.iscoroutinefunction' is deprecated:DeprecationWarning",
+]
 
 [build-system]
 requires = ["poetry-core"]

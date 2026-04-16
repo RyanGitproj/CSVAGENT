@@ -1,101 +1,154 @@
-# AskCSV — posez des questions à vos CSV en langage naturel
+# AskNova — Analyse de données par IA
 
-Une petite API qui vous évite d’ouvrir Excel pour l’énième fois : vous uploadez un fichier CSV, il est indexé (Parquet + FAISS), puis vous conversez avec un agent LangChain qui interroge vos données via du pandas exécuté dans un bac à sable sécurisé.
+Importez des fichiers CSV/Excel ou des documents PDF et posez des questions en langage naturel. Obtenez des réponses précises grâce à une approche SQL-first pour les données tabulaires et à une recherche sémantique (RAG) pour les documents.
 
-En résumé : **téléversement → indexation → questions-réponses en français ou en anglais**, le tout derrière une API FastAPI documentée.
+## Vue d'ensemble
 
----
+AskNova est une application full-stack qui permet de:
+- **Analyser des données tabulaires** (CSV/Excel) avec une approche SQL-first pour des résultats fiables et vérifiables
+- **Rechercher des documents** (PDF) avec une recherche sémantique et RAG avec citations
+- **Poser des questions** en langage naturel et obtenir des réponses précises
+- **Supporter plusieurs providers LLM** (Groq, Gemini, Ollama)
 
-## Ce dont vous avez besoin
+Idéal pour les boutiques, restaurants et entreprises qui ont besoin d'analyser rapidement leur inventaire, catalogues, menus ou fiches produits.
 
-- **Python 3.11+**
-- **[Poetry](https://python-poetry.org/)** pour les dépendances
-- Une **clé API OpenAI** (les embeddings et le modèle de chat passent par OpenAI)
+## Stack Technique
 
----
+**Backend:**
+- FastAPI (Python)
+- LangChain pour l'intégration LLM
+- FAISS pour la recherche vectorielle
+- DuckDB pour les requêtes SQL
 
-## Installation
+**Frontend:**
+- React
+- Vite (outil de build)
+- Interface moderne et responsive
 
-À la racine du projet :
+## Structure du Projet
 
-```bash
-poetry install
+```
+csv_repo-main/
+├── app/                    # Backend FastAPI
+│   ├── config.py          # Configuration
+│   ├── server.py          # Serveur API
+│   ├── embeddings.py      # Providers d'embeddings
+│   ├── llm.py             # Providers LLM
+│   ├── rate_limit.py      # Rate limiting
+│   └── services/          # Logique métier
+├── frontend-vite/          # Frontend React + Vite
+│   ├── src/
+│   │   ├── App.jsx       # Composant React principal
+│   │   ├── main.jsx      # Point d'entrée
+│   │   ├── api.js        # Client API
+│   │   ├── utils.js      # Utilitaires
+│   │   └── css/          # Styles
+│   ├── public/assets/    # Assets statiques
+│   └── dist/             # Build de production
+├── tests/                  # Tests backend
+├── requirements.txt        # Dépendances Python
+└── .gitignore             # Règles Git ignore
 ```
 
-Copiez le fichier d’exemple des variables d’environnement et renseignez vos vraies valeurs **dans un fichier local qui ne partira jamais sur Git** :
+## Lancer Localement
+
+### Backend
 
 ```bash
-copy .env.example .env
+# Activer l'environnement virtuel
+.venv\Scripts\activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Démarrer le backend
+python -m uvicorn app.server:app --host 0.0.0.0 --port 8000
 ```
 
-Sur macOS/Linux :
+Backend fonctionne sur: http://localhost:8000
+Documentation API: http://localhost:8000/docs
+
+### Frontend
 
 ```bash
-cp .env.example .env
+cd frontend-vite
+
+# Installer les dépendances
+npm install
+
+# Démarrer le serveur de développement
+npm run dev
 ```
 
-Ouvrez `.env` et complétez au minimum `OPENAI_API_KEY=`. Le reste (LangSmith, modèles, température) est optionnel — voyez les commentaires dans `.env.example`.
+Frontend fonctionne sur: http://localhost:5173
 
----
+## Variables d'Environnement
 
-## Lancer l’API en local
-
-```bash
-poetry run uvicorn app.server:app --reload --host 0.0.0.0 --port 8000
-```
-
-Ensuite ouvrez votre navigateur sur **http://localhost:8000** — vous serez redirigé vers la doc interactive (**Swagger**). C’est souvent le plus simple pour tester l’upload et les questions.
-
-Endpoints utiles :
-
-- `GET /health` — vérifie que le service répond
-- `POST /parquet/upload_file` — envoi d’un CSV (multipart)
-- `POST /askcsv/double/{process_id}` — conversation sur les données liées à un `process_id` (celui retourné après l’upload)
-
----
-
-## LangSmith (facultatif)
-
-Si vous voulez **tracer et déboguer** les chaînes LangChain, créez un compte sur [LangSmith](https://smith.langchain.com/), puis dans votre `.env` :
+Créez un fichier `.env` à la racine du projet:
 
 ```env
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=votre_clé
-LANGCHAIN_PROJECT=nom_du_projet
+# Provider LLM (groq, gemini, ollama)
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=llama-3.3-70b-versatile
+
+# Ollama (si vous utilisez des modèles locaux)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+
+# Gemini (alternative)
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
+
+# Embeddings
+EMBEDDINGS_PROVIDER=sentence_transformers
+EMBEDDINGS_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+# Frontend (dans frontend-vite/.env)
+VITE_API_URL=http://localhost:8000
 ```
 
-Si vous n’en avez pas besoin, laissez le traçage désactivé — l’API fonctionne très bien sans.
+## Déploiement
 
----
+Le projet est conçu pour être déployé avec le backend et le frontend séparés.
 
-## Avec Docker
+### Backend
 
-Construction de l’image :
+Déployez le backend sur n'importe quel service d'hébergement Python (Heroku, Railway, etc.):
 
-```bash
-docker build -t askcsv-api .
-```
+- Configurez les variables d'environnement requises
+- Commande de démarrage: `uvicorn app.server:app --host 0.0.0.0 --port $PORT`
 
-Lancement (pensez à passer votre clé OpenAI, sans la commiter dans un fichier d’image) :
+### Frontend
 
-```bash
-docker run -e OPENAI_API_KEY=%OPENAI_API_KEY% -p 8080:8080 askcsv-api
-```
+Déployez le frontend sur n'importe quel service d'hébergement statique (Netlify, Surge, etc.):
 
-Sous PowerShell, `%OPENAI_API_KEY%` fait référence à la variable d’environnement déjà définie sur votre machine. Sous bash :
+- Configurez la variable d'environnement `VITE_API_URL` avec l'URL de votre backend
+- Commande de build: `npm run build`
+- Répertoire de sortie: `dist/`
 
-```bash
-docker run -e OPENAI_API_KEY="$OPENAI_API_KEY" -p 8080:8080 askcsv-api
-```
+## Notes
 
-L’API écoute alors sur le **port 8080** du conteneur.
+- **Frontend et backend séparés** - déployés indépendamment
+- **Communication API via HTTP** - CORS configuré pour la production
+- **Docker NON utilisé** - déploiement via services d'hébergement standard
+- **Rate limiting** - configuré pour la protection de l'API
+- **Providers LLM multiples** - Groq (rapide, tier gratuit), Gemini, Ollama (local)
 
----
+## Endpoints API
 
-## Tests
+- `GET /health` - Vérification de santé
+- `GET /limits` - Limites et quotas actuels
+- `GET /llm/options` - Providers et modèles LLM disponibles
+- `POST /datasets` - Créer un dataset
+- `GET /datasets` - Lister tous les datasets
+- `POST /datasets/{id}/ingest/auto` - Ingestion automatique (PDF ou CSV/Excel)
+- `POST /datasets/{id}/ask` - Poser une question sur un dataset
+- `POST /ask/free` - Chat libre sans dataset
+- `GET /conversations` - Lister les conversations
+- `GET /conversations/{id}/messages` - Messages d'une conversation
+- `DELETE /conversations/{id}` - Supprimer une conversation
 
-```bash
-poetry run pytest
-```
+## Licence
 
----
+Copyright © 2026 Tsioritiana Ryan

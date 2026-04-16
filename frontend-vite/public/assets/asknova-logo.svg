@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="AskNova logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#20f2c7"/>
+      <stop offset="1" stop-color="#b58bff"/>
+    </linearGradient>
+    <radialGradient id="rg" cx="30%" cy="25%" r="75%">
+      <stop offset="0" stop-color="#20f2c7" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#b58bff" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="
+        1 0 0 0 0
+        0 1 0 0 0
+        0 0 1 0 0
+        0 0 0 0.85 0" result="g"/>
+      <feMerge>
+        <feMergeNode in="g"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background (transparent-friendly) -->
+  <rect width="256" height="256" rx="56" fill="#050812"/>
+  <circle cx="96" cy="86" r="120" fill="url(#rg)"/>
+
+  <!-- Nova mark -->
+  <g filter="url(#glow)">
+    <!-- Orbit -->
+    <path d="M54 150c24 32 63 50 104 42 44-9 79-44 86-88" fill="none" stroke="url(#g)" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+    <!-- Star -->
+    <path d="M128 52l12 34 34 12-34 12-12 34-12-34-34-12 34-12 12-34z" fill="url(#g)"/>
+    <!-- Core dot -->
+    <circle cx="178" cy="98" r="10" fill="#20f2c7"/>
+  </g>
+</svg>

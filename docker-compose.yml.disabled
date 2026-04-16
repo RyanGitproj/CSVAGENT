@@ -1,0 +1,29 @@
+# API + stockage persistant. Profil optionnel pour Ollama (LLM local).
+#   docker compose up --build
+#   docker compose --profile ollama up --build
+#
+# Avec le profil ollama, définir dans .env : LLM_PROVIDER=ollama et OLLAMA_BASE_URL=http://ollama:11434
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8080"
+    environment:
+      DATA_DIR: /data
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    volumes:
+      - askcsv_data:/data
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  askcsv_data:
+  ollama_data:
