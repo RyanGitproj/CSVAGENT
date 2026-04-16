@@ -1,5 +1,5 @@
 // API client for AskNova frontend (Vite version)
-const API_BASE_URL = "https://YOUR-BACKEND-RENDER-URL.onrender.com";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // Helper function for JSON fetch
 async function fetchJson(url, options = {}) {
