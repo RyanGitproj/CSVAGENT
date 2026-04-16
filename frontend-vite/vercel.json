@@ -3,10 +3,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "framework": "vite",
-  "env": {
-    "VITE_API_URL": {
-      "description": "URL de l'API backend (ex: https://votre-backend.onrender.com)"
-    }
-  }
+  "framework": "vite"
 }
