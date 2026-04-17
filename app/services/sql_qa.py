@@ -67,6 +67,8 @@ _PROMPT_FILTERED = ChatPromptTemplate.from_messages(
             "- Use only the provided columns.\n"
             "- The column `__source_file` identifies which imported file each row comes from.\n"
             "- You MUST include: WHERE __source_file IN ({allowed_sources}) (combine with AND if other predicates).\n"
+            "- Check column profiles for data types. If a column is VARCHAR/text but the question asks for numeric/date calculations, try using LIKE pattern matching as an alternative instead of giving up.\n"
+            "- For date-related questions on text columns, try filtering with LIKE for year patterns (e.g., LIKE '%1943%' for year 1943) instead of date calculations.\n"
             '- The "answer" field must summarize what the SQL result shows; if the result is empty, say so clearly.\n'
             '- The "answer" text must be in the same language as the user\'s question (the « Question actuelle » line).\n'
             "Columns:\n{columns}\n"
@@ -103,6 +105,36 @@ _PROMPT_LEGACY = ChatPromptTemplate.from_messages(
         ("human", "{question}"),
     ]
 )
+
+
+def _escape_column_names(sql: str, columns: list[str]) -> str:
+    """
+    Échappe automatiquement les noms de colonnes qui contiennent des espaces ou caractères spéciaux.
+    Cette fonction post-processe le SQL généré par le LLM pour corriger les noms de colonnes.
+    """
+    if not sql or not columns:
+        return sql
+
+    result = sql
+    for col in columns:
+        if not col:
+            continue
+        # Si le nom contient des espaces ou caractères non-alphanumériques (sauf underscore)
+        if any(c.isspace() or not (c.isalnum() or c == '_') for c in col):
+            # Remplacer les backticks par des guillemets doubles
+            result = result.replace(f'`{col}`', f'"{col}"')
+            # Remplacer les versions normalisées avec underscores
+            normalized = col.replace(' ', '_').replace('-', '_')
+            result = result.replace(f'`{normalized}`', f'"{col}"')
+            result = result.replace(normalized, f'"{col}"')
+            # Remplacer le nom original non-échappé par la version échappée
+            # Utiliser une approche plus robuste avec regex pour éviter de remplacer dans les chaînes littérales
+            import re
+            # Pattern: mot qui n'est pas déjà entre guillemets doubles
+            pattern = r'\b' + re.escape(col) + r'\b(?=(?:[^"]*"[^"]*")*[^"]*$)'
+            result = re.sub(pattern, f'"{col}"', result)
+
+    return result
 
 
 def _validate_sql(sql: str) -> str:
@@ -422,14 +454,30 @@ class SQLQAService:
             raise coerce_to_llm_error(exc) from exc
 
         try:
-            obj = json.loads(raw)
-            sql = _validate_sql(obj.get("sql", ""))
-            answer = str(obj.get("answer", "")).strip() or "OK."
+            # Nettoyer la réponse: enlever blocs markdown ```json ... ```
+            cleaned = (raw or "").strip()
+            if cleaned.startswith("```"):
+                lines = cleaned.split("\n")
+                lines = [l for l in lines if not l.strip().startswith("```")]
+                cleaned = "\n".join(lines).strip()
+            # Chercher le premier objet JSON dans la réponse
+            json_start = cleaned.find("{")
+            json_end = cleaned.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                cleaned = cleaned[json_start:json_end]
+            if not cleaned:
+                raise ValueError("LLM a retourné une réponse vide")
+            obj = json.loads(cleaned)
+            sql = obj.get("sql", "")
+            # Échapper automatiquement les noms de colonnes avec espaces/caractères spéciaux
+            sql = _escape_column_names(sql, cols)
+            sql = _validate_sql(sql)
         except HTTPException:
             raise
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"LLM output parsing error: {exc}") from exc
 
+        # Exécuter le SQL d'abord
         db_path = tabular_db_path(dataset_id)
         con = duckdb.connect(str(db_path), read_only=True)
         try:
@@ -437,9 +485,50 @@ class SQLQAService:
             cur = con.execute(sql)
             colnames = [d[0] for d in cur.description]
             rows = cur.fetchmany(100)
+        except Exception as sql_exc:
+            con.close()
+            # Log pour déboguer
+            print(f"[SQL ERROR] Question: {question}")
+            print(f"[SQL ERROR] Generated SQL: {sql}")
+            print(f"[SQL ERROR] Error: {sql_exc}")
+            # Retourner une réponse explicite sur l'erreur SQL
+            error_msg = str(sql_exc)
+            if "Parser Error" in error_msg or "syntax error" in error_msg:
+                return "Erreur de syntaxe SQL. Le format des données ne permet pas cette requête.", "", []
+            elif "Conversion Error" in error_msg:
+                return "Erreur de conversion: les données ne sont pas dans le bon format pour ce calcul.", "", []
+            else:
+                return f"Erreur SQL: {error_msg[:100]}", "", []
         finally:
             con.close()
 
         preview = [dict(zip(colnames, r, strict=False)) for r in rows]
+
+        # Générer la réponse basée sur les résultats réels
+        try:
+            answer_prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are a helpful data assistant. Based on the SQL query results, answer the user's question in a clear and direct way. Use the same language as the user's question. If there are no results, explicitly state that no results were found."),
+                ("human", "Question: {question}\n\nSQL Results:\n{results}\n\nAnswer the question based on these results.")
+            ])
+            
+            results_text = "\n".join(
+                f"Row {i+1}: " + ", ".join(f"{k}={v}" for k, v in row.items())
+                for i, row in enumerate(preview[:10])
+            )
+            if not preview:
+                results_text = "No results found. The query returned 0 rows."
+            
+            answer_chain = answer_prompt | llm | StrOutputParser()
+            answer = answer_chain.invoke({
+                "question": question,
+                "results": results_text
+            }).strip()
+            
+            if not answer:
+                answer = "Aucun résultat trouvé." if not preview else f"{len(preview)} résultat(s) trouvé(s)."
+        except Exception:
+            # Fallback: utiliser la réponse originale si le second appel échoue
+            answer = str(obj.get("answer", "")).strip() or "OK."
+
         return answer, sql, preview
 

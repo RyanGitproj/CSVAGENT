@@ -85,22 +85,49 @@ def _sniff_csv_dialect(text_sample: str) -> tuple[str | None, str | None]:
 
 
 def _read_csv_fast(file_path: Path, *, encoding: str, sep: str | None, quotechar: str | None) -> pd.DataFrame:
+    # Essai 1: quoting standard avec quotechar détecté ou guillemets par défaut
+    qc = quotechar or '"'
     try:
         return pd.read_csv(
             file_path,
             encoding=encoding,
             engine="c",
             sep=sep,
-            quotechar=quotechar,
+            quotechar=qc,
+            quoting=csv.QUOTE_MINIMAL,
         )
     except Exception:
+        pass
+
+    # Essai 2: engine python + ignorer les lignes incohérentes
+    try:
         return pd.read_csv(
             file_path,
             encoding=encoding,
             engine="python",
             sep=sep,
-            quotechar=quotechar,
+            quotechar=qc,
+            quoting=csv.QUOTE_MINIMAL,
+            on_bad_lines="skip",
         )
+    except Exception:
+        pass
+
+    # Essai 3: quoting désactivé + ignorer les lignes incohérentes
+    try:
+        return pd.read_csv(
+            file_path,
+            encoding=encoding,
+            engine="python",
+            sep=sep,
+            quoting=csv.QUOTE_NONE,
+            on_bad_lines="skip",
+        )
+    except Exception:
+        pass
+
+    # Essai 4: fallback ultime - laisser pandas tout deviner
+    return pd.read_csv(file_path, encoding=encoding, on_bad_lines="skip")
 
 
 def _normalize_col_name(name: str) -> str:
